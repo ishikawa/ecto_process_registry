@@ -3,10 +3,9 @@ defmodule EctoNameRegistry.Pid do
 
   @primary_key false
   schema "ecto_name_registry_pids" do
-    field :pid, :binary, primary_key: true
     field :key, :string, primary_key: true
-
-    belongs_to :name, EctoNameRegistry.Name
+    belongs_to :name, EctoNameRegistry.Name, primary_key: true
+    field :pid, :binary
     timestamps updated_at: false
   end
 end

@@ -2,8 +2,10 @@ defmodule EctoNameRegistryTest do
   use ExUnit.Case, async: true
   doctest EctoNameRegistry
 
+  alias EctoNameRegistry.{Repo, Pid}
+
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(EctoNameRegistry.Repo)
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
   end
 
   describe "start_link" do
@@ -32,7 +34,7 @@ defmodule EctoNameRegistryTest do
     setup context do
       name = context[:registry_name] || :name_registry
       registry = start_supervised!({EctoNameRegistry, name: name})
-      Ecto.Adapters.SQL.Sandbox.allow(EctoNameRegistry.Repo, self(), registry)
+      Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
       {:ok, %{registry: registry}}
     end
 
@@ -45,6 +47,10 @@ defmodule EctoNameRegistryTest do
       Agent.update(name, &(&1 + 1))
       assert Agent.get(name, & &1) == 1
       assert Agent.stop(pid) == :ok
+
+      # Process terminated
+      assert EctoNameRegistry.whereis_name({registry_name, "agent"}) == :undefined
+      refute Repo.get_by(Pid, key: "agent")
     end
   end
 end

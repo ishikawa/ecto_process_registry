@@ -6,6 +6,8 @@ defmodule EctoNameRegistry do
 
   alias EctoNameRegistry.{Repo, Name, Pid}
 
+  require Logger
+
   @spec start_link([option] | GenServer.options()) :: GenServer.on_start()
         when option: {:name, atom}
   def start_link(options) do
@@ -26,7 +28,7 @@ defmodule EctoNameRegistry do
 
   @impl true
   def init(%{name: registry_name}) do
-    {:ok, %{name: to_string(registry_name)}}
+    {:ok, %{name: to_string(registry_name), keys: %{}}}
   end
 
   @type key :: atom | String.t()
@@ -47,6 +49,11 @@ defmodule EctoNameRegistry do
     GenServer.call(registry, {:register_name, key, pid})
   end
 
+  @doc false
+  def unregister_name({registry, key}) do
+    GenServer.call(registry, {:unregister_name, key})
+  end
+
   @impl true
   def handle_call({:whereis_name, key}, _from, %{name: registry_name} = state) do
     with %Name{id: name_id} <- Repo.get_by(Name, name: registry_name),
@@ -61,7 +68,7 @@ defmodule EctoNameRegistry do
   end
 
   @impl true
-  def handle_call({:register_name, key, pid}, _from, %{name: registry_name} = state) do
+  def handle_call({:register_name, key, pid}, _from, %{name: registry_name, keys: keys} = state) do
     %Name{id: name_id} =
       with nil <- Repo.get_by(Name, name: registry_name) do
         Repo.insert!(%Name{name: registry_name})
@@ -71,11 +78,53 @@ defmodule EctoNameRegistry do
     |> Repo.insert()
     |> case do
       {:ok, _pid} ->
-        {:reply, :yes, state}
+        # Monitor the registered process to make it possible to DELETE the row in
+        # the database when the process is stopped/crashed.
+        ref = Process.monitor(pid)
+        keys = Map.put(keys, ref, key)
+        {:reply, :yes, %{state | keys: keys}}
 
       {:error, changeset} ->
         IO.inspect(changeset)
         {:reply, :no, state}
     end
+  end
+
+  @impl true
+  def handle_call({:unregister_name, key}, _from, %{name: registry_name} = state) do
+    with %Name{id: name_id} <- Repo.get_by(Name, name: registry_name),
+         %Pid{} = pid <- Repo.get_by(Pid, name_id: name_id, key: to_string(key)) do
+      Repo.delete!(pid)
+    end
+
+    {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, ref, :process, object, reason}, %{keys: keys} = state) do
+    IO.puts("{:DOWN, #{inspect(ref)}, :process, #{inspect(object)}, #{inspect(reason)}}")
+
+    state =
+      case Map.fetch(keys, ref) do
+        {:ok, key} ->
+          {:reply, :ok, state} = handle_call({:unregister_name, key}, self(), state)
+          %{state | keys: Map.delete(keys, ref)}
+
+        :error ->
+          Logger.warn(
+            "Unknown process #{inspect(object)} DOWN message received for reference #{
+              inspect(ref)
+            }"
+          )
+
+          state
+      end
+
+    {:noreply, state}
+  end
+
+  def handle_info(msg, state) do
+    IO.puts("Unknown message received: #{inspect(msg)}")
+    {:noreply, state}
   end
 end

@@ -1,0 +1,80 @@
+defaults: &defaults
+  working_directory: ~/circulate
+  docker:
+    - image: circleci/elixir:1.9.1
+    - image: postgres:9.6.1
+      environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: ''
+
+version: 2
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          # Save mix.lock before mix deps.get because mix deps.get can
+          # update mix.lock.
+          name: Save mix.lock
+          command: cp mix.lock _mix.lock
+      - restore_cache:
+          keys:
+            - v1-deps-{{ .Branch }}
+            - v1-deps-
+      - run:
+          name: Install dependencies
+          command: |
+            mix local.hex --force
+            mix local.rebar --force
+            mix deps.get
+      - save_cache:
+          key: v1-deps-{{ .Branch }}
+          paths:
+            - deps
+      - restore_cache:
+          keys:
+            - v1-build-deps-{{ .Branch }}-{{ checksum "_mix.lock" }}
+            - v1-build-deps-{{ .Branch }}-
+      - run:
+          name: Compile
+          environment:
+            MIX_ENV: test
+          command: |
+            mix compile --warnings-as-errors
+      - run:
+          name: Check code formatted
+          environment:
+            MIX_ENV: test
+          command: |
+            mix format --check-formatted
+      - save_cache:
+          key: v1-build-deps-{{ .Branch }}-{{ checksum "_mix.lock" }}
+          paths:
+            - _build/test/lib
+            - ~/.cache/rebar3
+            # ls -d deps/*/ebin
+            - deps/telemetry/ebin
+      - restore_cache:
+          keys:
+            - v1-plts
+      - run:
+          name: Dialyxir
+          command: |
+            mix dialyzer
+      - save_cache:
+          key: v1-plts
+          paths:
+            - priv/plts
+      - run:
+          name: Test
+          environment:
+            MIX_ENV: test
+          command: |
+            mix do compile --warnings-as-errors, test
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build

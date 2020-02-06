@@ -1,6 +1,6 @@
 # EctoNameRegistry
 
-**TODO: Add description**
+[Process name registry](https://hexdocs.pm/elixir/GenServer.html#module-name-registration) with Ecto backend.
 
 ## Installation
 

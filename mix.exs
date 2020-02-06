@@ -1,9 +1,9 @@
-defmodule EctoNameRegistry.MixProject do
+defmodule EctoProcessRegistry.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :ecto_name_registry,
+      app: :ecto_process_registry,
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
@@ -19,7 +19,7 @@ defmodule EctoNameRegistry.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {EctoNameRegistry.Application, []}
+      mod: {EctoProcessRegistry.Application, []}
     ]
   end
 

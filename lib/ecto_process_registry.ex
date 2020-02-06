@@ -1,10 +1,10 @@
-defmodule EctoNameRegistry do
+defmodule EctoProcessRegistry do
   @moduledoc """
-  Documentation for EctoNameRegistry.
+  Documentation for EctoProcessRegistry.
   """
   use GenServer
 
-  alias EctoNameRegistry.{Name, Pid}
+  alias EctoProcessRegistry.{Name, Pid}
 
   import Ecto.Query
 

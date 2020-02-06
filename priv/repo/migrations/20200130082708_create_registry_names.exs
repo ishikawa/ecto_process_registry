@@ -1,7 +1,7 @@
-defmodule EctoNameRegistry.Repo.Migrations.CreateRegistryNames do
+defmodule EctoProcessRegistry.Repo.Migrations.CreateRegistryNames do
   use Ecto.Migration
 
-  @table "ecto_name_registry_names"
+  @table "ecto_process_registry_names"
 
   def change do
     create table(@table) do

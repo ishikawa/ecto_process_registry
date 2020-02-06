@@ -1,8 +1,8 @@
-defmodule EctoNameRegistryTest do
+defmodule EctoProcessRegistryTest do
   use ExUnit.Case, async: true
-  doctest EctoNameRegistry
+  doctest EctoProcessRegistry
 
-  alias EctoNameRegistry.{Repo, Pid}
+  alias EctoProcessRegistry.{Repo, Pid}
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -11,7 +11,7 @@ defmodule EctoNameRegistryTest do
   describe "start_link" do
     test "given no :name option" do
       assert_raise ArgumentError, "expected :name option to be present", fn ->
-        EctoNameRegistry.start_link([])
+        EctoProcessRegistry.start_link([])
       end
     end
 
@@ -19,26 +19,26 @@ defmodule EctoNameRegistryTest do
       @tag name: not_atom_value
       test "given invalid :name option: #{inspect(not_atom_value)}", %{name: name} do
         assert_raise ArgumentError, ~r/expected :name to be an atom, got:/, fn ->
-          EctoNameRegistry.start_link(name: name)
+          EctoProcessRegistry.start_link(name: name)
         end
       end
 
       @tag repo: not_atom_value
       test "given invalid :repo option: #{inspect(not_atom_value)}", %{repo: repo} do
         assert_raise ArgumentError, ~r/expected :repo to be a Ecto.Repo module, got:/, fn ->
-          EctoNameRegistry.start_link(name: :test, repo: repo)
+          EctoProcessRegistry.start_link(name: :test, repo: repo)
         end
       end
     end
 
     test "given no :repo option" do
       assert_raise ArgumentError, "expected :repo option to be present", fn ->
-        EctoNameRegistry.start_link(name: :test)
+        EctoProcessRegistry.start_link(name: :test)
       end
     end
 
     test "given name option" do
-      assert {:ok, pid} = EctoNameRegistry.start_link(name: :foo, repo: Repo)
+      assert {:ok, pid} = EctoProcessRegistry.start_link(name: :foo, repo: Repo)
       assert is_pid(pid)
     end
   end
@@ -46,14 +46,14 @@ defmodule EctoNameRegistryTest do
   describe "name registration" do
     setup context do
       name = context[:registry_name] || :name_registry
-      registry = start_supervised!({EctoNameRegistry, name: name, repo: Repo})
+      registry = start_supervised!({EctoProcessRegistry, name: name, repo: Repo})
       Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
       {:ok, %{registry: registry}}
     end
 
-    @tag registry_name: EctoNameRegistry.ViaTest
+    @tag registry_name: EctoProcessRegistry.ViaTest
     test "using in :via", %{registry_name: registry_name} do
-      name = {:via, EctoNameRegistry, {registry_name, "agent"}}
+      name = {:via, EctoProcessRegistry, {registry_name, "agent"}}
 
       assert {:ok, pid} = Agent.start_link(fn -> 0 end, name: name)
       assert Agent.get(name, & &1) == 0
@@ -62,33 +62,33 @@ defmodule EctoNameRegistryTest do
       assert Agent.stop(pid) == :ok
 
       # Process terminated
-      assert EctoNameRegistry.whereis_name({registry_name, "agent"}) == :undefined
+      assert EctoProcessRegistry.whereis_name({registry_name, "agent"}) == :undefined
       refute Repo.get_by(Pid, key: "agent")
     end
 
     test "register_name", %{registry: registry} do
-      assert EctoNameRegistry.register_name({registry, "my pid"}, self()) == :yes
-      assert EctoNameRegistry.whereis_name({registry, "my pid"}) == self()
+      assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :yes
+      assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
       # already registered
-      assert EctoNameRegistry.register_name({registry, "my pid"}, self()) == :no
+      assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :no
     end
 
     test "register already died process", %{registry: registry} do
       pid = :erlang.list_to_pid('<0.104.0>')
       refute Process.alive?(pid)
-      assert EctoNameRegistry.register_name({registry, "my pid"}, pid) == :yes
-      assert EctoNameRegistry.whereis_name({registry, "my pid"}) == :undefined
+      assert EctoProcessRegistry.register_name({registry, "my pid"}, pid) == :yes
+      assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == :undefined
 
       # Users can register a new process if the old one already died.
-      assert EctoNameRegistry.register_name({registry, "my pid"}, self()) == :yes
-      assert EctoNameRegistry.whereis_name({registry, "my pid"}) == self()
+      assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :yes
+      assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
     end
 
     test "demonitor -> kill -> register", %{registry: registry} do
       assert {:ok, agent} = Agent.start(fn -> 0 end)
 
-      assert EctoNameRegistry.register_name({registry, "agent"}, agent) == :yes
-      assert EctoNameRegistry.demonitor({registry, "agent"})
+      assert EctoProcessRegistry.register_name({registry, "agent"}, agent) == :yes
+      assert EctoProcessRegistry.demonitor({registry, "agent"})
 
       # kill process
       assert Process.exit(agent, :kill)
@@ -98,8 +98,8 @@ defmodule EctoNameRegistryTest do
 
       # Users can register a new process if the old one died even if
       # the record exists.
-      assert EctoNameRegistry.register_name({registry, "agent"}, self()) == :yes
-      assert EctoNameRegistry.whereis_name({registry, "agent"}) == self()
+      assert EctoProcessRegistry.register_name({registry, "agent"}, self()) == :yes
+      assert EctoProcessRegistry.whereis_name({registry, "agent"}) == self()
     end
   end
 end

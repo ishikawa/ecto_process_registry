@@ -20,7 +20,7 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-ecto_name_registry-*.tar
+ecto_process_registry-*.tar
 
 .DS_Store
 /priv/plts/*.plt

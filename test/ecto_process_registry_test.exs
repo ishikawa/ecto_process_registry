@@ -1,4 +1,6 @@
 defmodule EctoProcessRegistryTest do
+  # TODO: Add local cluster tests
+
   use ExUnit.Case, async: true
   doctest EctoProcessRegistry
 

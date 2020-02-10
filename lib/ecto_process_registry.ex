@@ -196,7 +196,7 @@ defmodule EctoProcessRegistry do
 
                 _ ->
                   repo.insert!(changeset,
-                    on_conflict: {:replace, [:pid]},
+                    on_conflict: {:replace, [:node, :pid]},
                     conflict_target: [:key, :name_id]
                   )
               end

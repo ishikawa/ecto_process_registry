@@ -9,10 +9,15 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
 
   # Start supervised EctoProcessRegistry if `:registry_name` specified in the context.
   setup context do
-    name = context[:registry_name] || :name_registry
+    name =
+      with name when is_nil(name) <- context[:registry_name] do
+        n = :random.uniform(1_000)
+        :"ondemand_process_registry_#{n}"
+      end
+
     registry = start_supervised!({EctoProcessRegistry, name: name, repo: Repo})
     Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
-    {:ok, %{registry: registry}}
+    {:ok, %{registry: registry, registry_name: name}}
   end
 
   describe "register_name/2" do
@@ -62,7 +67,6 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
   end
 
   describe "name registration" do
-    @tag registry_name: EctoProcessRegistry.ViaTest
     test "using in :via", %{registry_name: registry_name} do
       name = {:via, EctoProcessRegistry, {registry_name, "agent"}}
 

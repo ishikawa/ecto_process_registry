@@ -20,10 +20,20 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
     {:ok, %{registry: registry, registry_name: name}}
   end
 
+  describe "whereis_name/2" do
+    test "no registration", %{registry: registry} do
+      assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == :undefined
+    end
+
+    test "register self", %{registry: registry} do
+      EctoProcessRegistry.register_name({registry, "my pid"}, self())
+      assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
+    end
+  end
+
   describe "register_name/2" do
     test "register name", %{registry: registry} do
       assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :yes
-      assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
       # already registered
       assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :no
     end

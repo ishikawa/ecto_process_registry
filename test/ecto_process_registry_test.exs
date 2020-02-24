@@ -10,6 +10,14 @@ defmodule EctoProcessRegistryTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
   end
 
+  # Start supervised EctoProcessRegistry if `:registry_name` specified in the context.
+  setup context do
+    name = context[:registry_name] || :name_registry
+    registry = start_supervised!({EctoProcessRegistry, name: name, repo: Repo})
+    Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
+    {:ok, %{registry: registry}}
+  end
+
   describe "start_link" do
     test "given no :name option" do
       assert_raise ArgumentError, "expected :name option to be present", fn ->
@@ -45,29 +53,7 @@ defmodule EctoProcessRegistryTest do
     end
   end
 
-  describe "name registration" do
-    setup context do
-      name = context[:registry_name] || :name_registry
-      registry = start_supervised!({EctoProcessRegistry, name: name, repo: Repo})
-      Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
-      {:ok, %{registry: registry}}
-    end
-
-    @tag registry_name: EctoProcessRegistry.ViaTest
-    test "using in :via", %{registry_name: registry_name} do
-      name = {:via, EctoProcessRegistry, {registry_name, "agent"}}
-
-      assert {:ok, pid} = Agent.start_link(fn -> 0 end, name: name)
-      assert Agent.get(name, & &1) == 0
-      Agent.update(name, &(&1 + 1))
-      assert Agent.get(name, & &1) == 1
-      assert Agent.stop(pid) == :ok
-
-      # Process terminated
-      assert EctoProcessRegistry.whereis_name({registry_name, "agent"}) == :undefined
-      refute Repo.get_by(Pid, key: "agent")
-    end
-
+  describe "register_name/2" do
     test "register_name", %{registry: registry} do
       assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :yes
       assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
@@ -85,7 +71,9 @@ defmodule EctoProcessRegistryTest do
       assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :yes
       assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
     end
+  end
 
+  describe "demonitor/2" do
     test "demonitor -> kill -> register", %{registry: registry} do
       assert {:ok, agent} = Agent.start(fn -> 0 end)
 
@@ -102,6 +90,23 @@ defmodule EctoProcessRegistryTest do
       # the record exists.
       assert EctoProcessRegistry.register_name({registry, "agent"}, self()) == :yes
       assert EctoProcessRegistry.whereis_name({registry, "agent"}) == self()
+    end
+  end
+
+  describe "name registration" do
+    @tag registry_name: EctoProcessRegistry.ViaTest
+    test "using in :via", %{registry_name: registry_name} do
+      name = {:via, EctoProcessRegistry, {registry_name, "agent"}}
+
+      assert {:ok, pid} = Agent.start_link(fn -> 0 end, name: name)
+      assert Agent.get(name, & &1) == 0
+      Agent.update(name, &(&1 + 1))
+      assert Agent.get(name, & &1) == 1
+      assert Agent.stop(pid) == :ok
+
+      # Process terminated
+      assert EctoProcessRegistry.whereis_name({registry_name, "agent"}) == :undefined
+      refute Repo.get_by(Pid, key: "agent")
     end
   end
 end

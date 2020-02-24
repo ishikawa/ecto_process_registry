@@ -31,7 +31,7 @@ defmodule EctoProcessRegistry.MixProject do
     [
       {:ecto, "~> 3.0"},
       {:ecto_sql, "~> 3.0"},
-      {:postgrex, "~> 0.15"},
+      {:postgrex, "~> 0.15", only: :test},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
     ]
   end

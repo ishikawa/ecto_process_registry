@@ -96,6 +96,10 @@ defmodule EctoProcessRegistry do
       {:badrpc, :nodedown} ->
         :nodedown
 
+      {:badrpc, {:EXIT, {:badarg, _stacktrace}}} ->
+        # unexpectedly pid is a remote node's pid
+        {:dead, node, pid}
+
       true ->
         {:ok, node, pid}
 

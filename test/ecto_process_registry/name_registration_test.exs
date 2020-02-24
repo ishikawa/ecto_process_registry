@@ -1,7 +1,7 @@
 defmodule EctoProcessRegistry.NameRegistrationTest do
   use ExUnit.Case, async: true
 
-  alias EctoProcessRegistry.{Repo, Pid}
+  alias EctoProcessRegistry.{Repo, Name, Pid}
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -10,7 +10,7 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
   # Start supervised EctoProcessRegistry if `:registry_name` specified in the context.
   setup context do
     name =
-      with name when is_nil(name) <- context[:registry_name] do
+      with nil <- context[:registry_name] do
         n = :random.uniform(1_000)
         :"ondemand_process_registry_#{n}"
       end
@@ -89,6 +89,60 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
       # Process terminated
       assert EctoProcessRegistry.whereis_name({registry_name, "agent"}) == :undefined
       refute Repo.get_by(Pid, key: "agent")
+    end
+  end
+
+  describe "register the pid of other node's process" do
+    setup %{registry_name: name} = context do
+      number_of_nodes = context[:number_of_nodes] || 1
+
+      nodes =
+        LocalCluster.start_nodes("other-node", number_of_nodes,
+          files: [
+            __ENV__.file
+          ]
+        )
+
+      nodes
+      |> Enum.each(
+        &Node.spawn_link(&1, fn ->
+          {:ok, registry} = EctoProcessRegistry.start_link(name: name, repo: Repo)
+          Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
+        end)
+      )
+
+      on_exit(fn ->
+        :ok = LocalCluster.stop_nodes(nodes)
+      end)
+
+      {:ok, %{nodes: nodes}}
+    end
+
+    @tag number_of_nodes: 1
+    test "unexpectedly registered other node's pid as local node's pid", %{
+      registry_name: registry_name,
+      nodes: [node]
+    } do
+      # Get the pid of other node's process by spawning actual node on the local machine,
+      # because `:erlang.list_to_pid/1` cannot create a remote pid.
+      pid = Node.spawn_link(node, fn -> :ok end)
+
+      # Manually register the created pid in DB.
+      %Name{id: name_id} =
+        with nil <- Repo.get_by(Name, name: to_string(registry_name)) do
+          Repo.insert!(%Name{name: to_string(registry_name)})
+        end
+
+      %Pid{name_id: name_id}
+      |> Pid.create_changeset(%{
+        key: "my pid",
+        node: to_string(Node.self()),
+        pid: :erlang.term_to_binary(pid)
+      })
+      |> Repo.insert!()
+
+      # test
+      assert EctoProcessRegistry.whereis_name({registry_name, "my pid"}) == :undefined
     end
   end
 end

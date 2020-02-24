@@ -54,11 +54,17 @@ defmodule EctoProcessRegistryTest do
   end
 
   describe "register_name/2" do
-    test "register_name", %{registry: registry} do
+    test "register name", %{registry: registry} do
       assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :yes
       assert EctoProcessRegistry.whereis_name({registry, "my pid"}) == self()
       # already registered
       assert EctoProcessRegistry.register_name({registry, "my pid"}, self()) == :no
+    end
+
+    test "when name is not a pid", %{registry: registry} do
+      assert_raise(FunctionClauseError, fn ->
+        assert EctoProcessRegistry.register_name({registry, "my pid"}, 12345) == :yes
+      end)
     end
 
     test "register already died process", %{registry: registry} do

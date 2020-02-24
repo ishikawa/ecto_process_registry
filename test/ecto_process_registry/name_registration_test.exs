@@ -11,7 +11,7 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
   setup context do
     name =
       with nil <- context[:registry_name] do
-        n = :random.uniform(1_000)
+        n = :rand.uniform(1_000)
         :"ondemand_process_registry_#{n}"
       end
 
@@ -93,7 +93,7 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
   end
 
   describe "register the pid of other node's process" do
-    setup %{registry_name: name} = context do
+    setup %{registry_name: _name} = context do
       number_of_nodes = context[:number_of_nodes] || 1
 
       nodes =
@@ -103,14 +103,6 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
           ]
         )
 
-      nodes
-      |> Enum.each(
-        &Node.spawn_link(&1, fn ->
-          {:ok, registry} = EctoProcessRegistry.start_link(name: name, repo: Repo)
-          Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
-        end)
-      )
-
       on_exit(fn ->
         :ok = LocalCluster.stop_nodes(nodes)
       end)
@@ -118,7 +110,6 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
       {:ok, %{nodes: nodes}}
     end
 
-    @tag number_of_nodes: 1
     test "unexpectedly registered other node's pid as local node's pid", %{
       registry_name: registry_name,
       nodes: [node]

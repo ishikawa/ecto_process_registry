@@ -55,7 +55,7 @@ defmodule EctoProcessRegistry do
 
   @doc false
   @spec register_name({GenServer.server(), key}, pid) :: :yes | :no
-  def register_name({registry, key}, pid) do
+  def register_name({registry, key}, pid) when is_pid(pid) do
     GenServer.call(registry, {:register_name, key, pid})
   end
 
@@ -95,6 +95,10 @@ defmodule EctoProcessRegistry do
     case :rpc.call(node, Process, :alive?, [pid]) do
       {:badrpc, :nodedown} ->
         :nodedown
+
+      {:badrpc, {:EXIT, {:badarg, _stacktrace}}} ->
+        # unexpectedly pid is a remote node's pid
+        {:dead, node, pid}
 
       true ->
         {:ok, node, pid}

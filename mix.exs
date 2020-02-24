@@ -31,14 +31,18 @@ defmodule EctoProcessRegistry.MixProject do
     [
       {:ecto, "~> 3.0"},
       {:ecto_sql, "~> 3.0"},
+      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
       {:postgrex, "~> 0.15", only: :test},
-      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
+      {:local_cluster,
+       github: "ishikawa/local-cluster",
+       ref: "0dfbbb6179ad4b7170915e513dcf3d1b19a04cce",
+       only: :test}
     ]
   end
 
   defp aliases do
     [
-      test: ["ecto.create --quiet", "ecto.migrate", "test"]
+      test: ["ecto.create --quiet", "ecto.migrate", "test --no-start"]
     ]
   end
 end

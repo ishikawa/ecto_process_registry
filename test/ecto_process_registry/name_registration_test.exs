@@ -93,7 +93,7 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
   end
 
   describe "register the pid of other node's process" do
-    setup %{registry_name: _name} = context do
+    setup %{registry_name: name} = context do
       number_of_nodes = context[:number_of_nodes] || 1
 
       nodes =
@@ -103,11 +103,70 @@ defmodule EctoProcessRegistry.NameRegistrationTest do
           ]
         )
 
+      # Setup remote nodes and waiting completion
+      caller = self()
+
+      remotes =
+        for node <- nodes do
+          pid =
+            Node.spawn_link(node, fn ->
+              {:ok, _} = Repo.start_link()
+
+              Application.ensure_all_started(:ecto_process_registry)
+
+              Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
+
+              :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+
+              {:ok, registry} = EctoProcessRegistry.start_link(name: name, repo: Repo)
+
+              Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), registry)
+
+              send(caller, {:setup, node})
+
+              IO.puts("waiting stop in #{node}")
+
+              receive do
+                :live_forever -> :ok
+              end
+            end)
+
+          {node, pid}
+        end
+
+      for {node, _pid} <- remotes do
+        receive do
+          {:setup, ^node} -> :ok
+        end
+      end
+
       on_exit(fn ->
         :ok = LocalCluster.stop_nodes(nodes)
       end)
 
       {:ok, %{nodes: nodes}}
+    end
+
+    test "register_name", %{registry_name: registry_name, nodes: [node]} do
+      caller = self()
+
+      Node.spawn_link(node, fn ->
+        EctoProcessRegistry.register_name({registry_name, "remote pid"}, self())
+        send(caller, {:register_name, node})
+
+        receive do
+          :live_forever -> :ok
+        end
+      end)
+
+      receive do
+        {:register_name, ^node} -> :ok
+      end
+
+      # NOTE: As of using Ecto.Repo.Sandbox in every nodes, we can execute INSERT/UPDATE/DELETE
+      # query ONLY in one node.
+      # assert EctoProcessRegistry.register_name({registry_name, "remote pid"}, self()) == :no
+      assert EctoProcessRegistry.whereis_name({registry_name, "remote pid"}) == :undefined
     end
 
     test "unexpectedly registered other node's pid as local node's pid", %{
